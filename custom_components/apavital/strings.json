@@ -83,6 +83,9 @@
       "water_monthly": {
         "name": "Current Month Consumption"
       },
+      "leak_confidence": {
+        "name": "Leak Confidence"
+      },
       "last_reading": {
         "name": "Last Reading"
       },
@@ -92,7 +95,30 @@
     },
     "binary_sensor": {
       "leak_detected": {
-        "name": "Leak Detected"
+        "name": "Leak Detected",
+        "state_attributes": {
+          "confidence": {
+            "name": "Confidence"
+          },
+          "reason": {
+            "name": "Reason"
+          },
+          "consecutive_hours": {
+            "name": "Consecutive Hours"
+          },
+          "coefficient_of_variation": {
+            "name": "Coefficient of Variation"
+          },
+          "r_squared": {
+            "name": "R² Score"
+          },
+          "night_consumption": {
+            "name": "Night Consumption"
+          },
+          "average_hourly_flow": {
+            "name": "Avg Hourly Flow"
+          }
+        }
       }
     }
   }

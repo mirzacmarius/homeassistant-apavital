@@ -83,6 +83,9 @@
       "water_monthly": {
         "name": "Consum Luna Curentă"
       },
+      "leak_confidence": {
+        "name": "Încredere Scurgere"
+      },
       "last_reading": {
         "name": "Ultima Citire"
       },
@@ -92,7 +95,30 @@
     },
     "binary_sensor": {
       "leak_detected": {
-        "name": "Scurgere Detectată"
+        "name": "Scurgere Detectată",
+        "state_attributes": {
+          "confidence": {
+            "name": "Încredere"
+          },
+          "reason": {
+            "name": "Motiv"
+          },
+          "consecutive_hours": {
+            "name": "Ore Consecutive"
+          },
+          "coefficient_of_variation": {
+            "name": "Coeficient de Variație"
+          },
+          "r_squared": {
+            "name": "Scor R²"
+          },
+          "night_consumption": {
+            "name": "Consum Nocturn"
+          },
+          "average_hourly_flow": {
+            "name": "Debit Mediu Orar"
+          }
+        }
       }
     }
   }

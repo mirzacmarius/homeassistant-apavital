@@ -86,6 +86,23 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         value_fn=lambda data: data.get("consumption_monthly"),
     ),
     ApavitalSensorEntityDescription(
+        key="leak_confidence",
+        translation_key="leak_confidence",
+        name="Leak Confidence",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:percent",
+        value_fn=lambda data: round(data.get("leak_confidence", 0) * 100, 1),
+        extra_attrs_fn=lambda data: {
+            "reason": data.get("leak_reason", ""),
+            "consecutive_hours": data.get("leak_consecutive_hours", 0),
+            "coefficient_of_variation": data.get("leak_cv"),
+            "r_squared": data.get("leak_r_squared"),
+            "night_consumption": data.get("leak_night_consumption", False),
+            "average_hourly_flow": data.get("leak_avg_flow", 0),
+        },
+    ),
+    ApavitalSensorEntityDescription(
         key="last_reading",
         translation_key="last_reading",
         name="Last Reading",
@@ -138,7 +155,7 @@ class ApavitalSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], SensorEnt
             "name": "Apavital Water Meter",
             "manufacturer": "Apavital",
             "model": "Smart Water Meter",
-            "sw_version": "1.0.2",
+            "sw_version": "1.1.0",
         }
     
     @property

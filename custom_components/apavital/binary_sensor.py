@@ -1,6 +1,8 @@
 """Binary sensor platform for Apavital integration."""
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -28,7 +30,15 @@ async def async_setup_entry(
 
 
 class ApavitalLeakSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], BinarySensorEntity):
-    """Binary sensor for water leak detection."""
+    """Binary sensor for water leak detection using pattern analysis.
+    
+    This sensor uses multiple factors to detect leaks:
+    - Consecutive hours with non-zero consumption
+    - Coefficient of variation (low = constant flow = leak)
+    - R² score (high linearity = constant flow = leak)
+    - Night-time consumption (very suspicious)
+    - Average hourly flow rate
+    """
     
     _attr_has_entity_name = True
     _attr_name = "Leak Detected"
@@ -58,11 +68,30 @@ class ApavitalLeakSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], Binar
         return None
 
     @property
-    def extra_state_attributes(self) -> dict[str, float]:
-        """Return extra state attributes."""
-        if self.coordinator.data:
-            return {
-                "hourly_consumption": self.coordinator.data.get("consumption_hourly", 0),
-                "threshold": self.coordinator.leak_threshold,
-            }
-        return {}
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes with detailed leak analysis."""
+        if not self.coordinator.data:
+            return {}
+        
+        data = self.coordinator.data
+        attrs: dict[str, Any] = {
+            # Basic info
+            "hourly_consumption": data.get("consumption_hourly", 0),
+            "threshold": self.coordinator.leak_threshold,
+            # Leak analysis results
+            "confidence": data.get("leak_confidence", 0),
+            "reason": data.get("leak_reason", ""),
+            # Individual factors
+            "consecutive_hours": data.get("leak_consecutive_hours", 0),
+            "coefficient_of_variation": data.get("leak_cv"),
+            "r_squared": data.get("leak_r_squared"),
+            "night_consumption": data.get("leak_night_consumption", False),
+            "average_hourly_flow": data.get("leak_avg_flow", 0),
+        }
+        
+        # Add detailed factors if available (for debugging/advanced users)
+        factors = data.get("leak_factors", {})
+        if factors:
+            attrs["analysis_factors"] = factors
+        
+        return attrs
