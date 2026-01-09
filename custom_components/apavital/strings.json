@@ -75,13 +75,13 @@
         "name": "Hourly Consumption"
       },
       "water_daily": {
-        "name": "Daily Consumption"
+        "name": "Current Day Consumption"
       },
       "water_weekly": {
-        "name": "Weekly Consumption"
+        "name": "Current Week Consumption"
       },
       "water_monthly": {
-        "name": "Monthly Consumption"
+        "name": "Current Month Consumption"
       },
       "last_reading": {
         "name": "Last Reading"

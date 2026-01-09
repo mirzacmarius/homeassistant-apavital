@@ -115,10 +115,34 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "readings": [],
         }
 
+    def _parse_reading_time(self, time_str: str) -> datetime | None:
+        """Parse reading timestamp string to datetime."""
+        if not time_str:
+            return None
+        try:
+            # Try common formats: "2024-01-15 14:00:00" or "2024-01-15T14:00:00"
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%d.%m.%Y %H:%M:%S"):
+                try:
+                    return datetime.strptime(time_str, fmt)
+                except ValueError:
+                    continue
+            return None
+        except Exception:
+            return None
+
+    def _find_reading_at_or_before(self, readings: list, target_time: datetime) -> dict | None:
+        """Find the reading closest to but not after target_time."""
+        for reading in reversed(readings):
+            reading_time = self._parse_reading_time(reading.get("TIME", ""))
+            if reading_time and reading_time <= target_time:
+                return reading
+        return None
+
     def _process_readings(self, readings: list, result: dict) -> dict[str, Any]:
         """Process readings and calculate consumption metrics."""
         last_reading = readings[-1]
         current_index = float(last_reading["INDEX_CIT"])
+        now = datetime.now()
         
         # Calculate various consumption periods
         hourly_consumption = 0
@@ -131,23 +155,29 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             prev_index = float(readings[-2]["INDEX_CIT"])
             hourly_consumption = round(current_index - prev_index, 4)
         
-        # Daily (last 24 readings)
-        if len(readings) >= 24:
-            start_index = float(readings[-24]["INDEX_CIT"])
+        # Current day consumption (since midnight today)
+        today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start_reading = self._find_reading_at_or_before(readings, today_midnight)
+        if day_start_reading:
+            start_index = float(day_start_reading["INDEX_CIT"])
             daily_consumption = round(current_index - start_index, 3)
         
-        # Weekly (last 168 readings = 7 days * 24 hours)
-        if len(readings) >= 168:
-            start_index = float(readings[-168]["INDEX_CIT"])
+        # Current week consumption (since Monday midnight)
+        days_since_monday = now.weekday()  # Monday = 0
+        week_start = (now - timedelta(days=days_since_monday)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        week_start_reading = self._find_reading_at_or_before(readings, week_start)
+        if week_start_reading:
+            start_index = float(week_start_reading["INDEX_CIT"])
             weekly_consumption = round(current_index - start_index, 3)
         
-        # Monthly estimate (last 720 readings = 30 days * 24 hours)
-        if len(readings) >= 720:
-            start_index = float(readings[-720]["INDEX_CIT"])
+        # Current month consumption (since 1st of month midnight)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_start_reading = self._find_reading_at_or_before(readings, month_start)
+        if month_start_reading:
+            start_index = float(month_start_reading["INDEX_CIT"])
             monthly_consumption = round(current_index - start_index, 3)
-        elif len(readings) >= 24:
-            # Estimate monthly based on daily average
-            monthly_consumption = round(daily_consumption * 30, 3)
         
         # Leak detection: if hourly consumption exceeds threshold
         leak_detected = hourly_consumption > self.leak_threshold

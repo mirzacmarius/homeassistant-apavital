@@ -58,7 +58,7 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
     ApavitalSensorEntityDescription(
         key="water_daily",
         translation_key="water_daily",
-        name="Daily Consumption",
+        name="Current Day Consumption",
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         device_class=SensorDeviceClass.WATER,
         state_class=SensorStateClass.TOTAL,
@@ -68,7 +68,7 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
     ApavitalSensorEntityDescription(
         key="water_weekly",
         translation_key="water_weekly",
-        name="Weekly Consumption",
+        name="Current Week Consumption",
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         device_class=SensorDeviceClass.WATER,
         state_class=SensorStateClass.TOTAL,
@@ -78,7 +78,7 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
     ApavitalSensorEntityDescription(
         key="water_monthly",
         translation_key="water_monthly",
-        name="Monthly Consumption",
+        name="Current Month Consumption",
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         device_class=SensorDeviceClass.WATER,
         state_class=SensorStateClass.TOTAL,
@@ -138,7 +138,7 @@ class ApavitalSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], SensorEnt
             "name": "Apavital Water Meter",
             "manufacturer": "Apavital",
             "model": "Smart Water Meter",
-            "sw_version": "1.0.1",
+            "sw_version": "1.0.2",
         }
     
     @property

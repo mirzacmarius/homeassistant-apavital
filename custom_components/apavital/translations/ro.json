@@ -75,13 +75,13 @@
         "name": "Consum Orar"
       },
       "water_daily": {
-        "name": "Consum Zilnic"
+        "name": "Consum Ziua Curentă"
       },
       "water_weekly": {
-        "name": "Consum Săptămânal"
+        "name": "Consum Săptămâna Curentă"
       },
       "water_monthly": {
-        "name": "Consum Lunar"
+        "name": "Consum Luna Curentă"
       },
       "last_reading": {
         "name": "Ultima Citire"
