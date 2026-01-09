@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurare Apavital",
+        "description": "Introduceți credențialele Apavital. Codul clientului (GRUPMAS_COD) poate fi găsit apelând /api/locuriCons. Token-ul JWT poate fi găsit în Developer Tools din browser.",
+        "data": {
+          "client_code": "Cod Client (GRUPMAS_COD)",
+          "jwt_token": "Token JWT"
+        },
+        "data_description": {
+          "client_code": "GRUPMAS_COD din locația de consum (ex: 416943)",
+          "jwt_token": "Token Bearer din sesiunea Apavital"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nu s-a putut conecta la API-ul Apavital",
+      "invalid_auth": "Autentificare invalidă. Token-ul JWT poate fi expirat.",
+      "unknown": "Eroare neașteptată"
+    },
+    "abort": {
+      "already_configured": "Această locație este deja configurată"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_index": {
+        "name": "Index Contor"
+      },
+      "water_daily": {
+        "name": "Consum Zilnic"
+      },
+      "last_update": {
+        "name": "Ultima Citire"
+      },
+      "meter_serial": {
+        "name": "Serie Contor"
+      }
+    }
+  }
+}

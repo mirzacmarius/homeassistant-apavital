@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Apavital Water Setup",
+        "description": "Enter your Apavital credentials. You can find the Client Code (GRUPMAS_COD) by calling the /api/locuriCons endpoint. The JWT token can be found in browser Developer Tools.",
+        "data": {
+          "client_code": "Client Code (GRUPMAS_COD)",
+          "jwt_token": "JWT Token"
+        },
+        "data_description": {
+          "client_code": "The GRUPMAS_COD from your consumption location (e.g., 416943)",
+          "jwt_token": "Bearer token from your Apavital session"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Apavital API",
+      "invalid_auth": "Invalid authentication. JWT token may have expired.",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This location is already configured"
+    }
+  }
+}
