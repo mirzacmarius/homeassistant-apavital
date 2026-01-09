@@ -72,16 +72,16 @@
         "name": "Water Index"
       },
       "water_hourly": {
-        "name": "Hourly Consumption"
+        "name": "Last Hour"
       },
       "water_daily": {
-        "name": "Current Day Consumption"
+        "name": "Today"
       },
       "water_weekly": {
-        "name": "Current Week Consumption"
+        "name": "This Week"
       },
       "water_monthly": {
-        "name": "Current Month Consumption"
+        "name": "This Month"
       },
       "last_reading": {
         "name": "Last Reading"
