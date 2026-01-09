@@ -9,14 +9,19 @@ Home Assistant integration for monitoring water consumption from [Apavital](http
 ## ✨ Features
 
 - 📊 **Energy Dashboard Compatible** - Works with HA Energy Dashboard for water tracking
-- 📈 **Real-time Data** - Hourly updates from your smart water meter
+- 📈 **Real-time Data** - Configurable update interval (15 min - 24 hours)
+- 🚰 **Leak Detection** - Automatic alerts when consumption exceeds threshold
 - 🔔 **Multiple Sensors**:
-  - Water Index (total consumption) - `sensor.apavital_water_index`
-  - Daily Consumption - `sensor.apavital_water_daily`
-  - Last Reading Time - `sensor.apavital_last_reading`
-  - Meter Serial Number - `sensor.apavital_meter_serial`
+  - Water Index (total consumption)
+  - Hourly/Daily/Weekly/Monthly Consumption
+  - Last Reading Time
+  - Meter Serial Number
+  - Leak Detection Binary Sensor
 - 🌍 **Multi-language** - English and Romanian translations
 - ⚙️ **Config Flow** - Easy setup through Home Assistant UI
+- 🔄 **Options Flow** - Update token and settings without removing integration
+- 🔧 **Diagnostics** - Debug info accessible via HA diagnostics
+- 📡 **Services** - Force data refresh on demand
 
 ## 📦 Installation
 
@@ -78,9 +83,45 @@ You need two pieces of information from your Apavital account:
 | Sensor | Description | Unit | Device Class |
 |--------|-------------|------|--------------|
 | `sensor.apavital_*_water_index` | Total water consumption (meter reading) | m³ | water |
-| `sensor.apavital_*_water_daily_consumption` | Consumption in last 24h | m³ | water |
+| `sensor.apavital_*_hourly_consumption` | Consumption in last hour | m³ | water |
+| `sensor.apavital_*_daily_consumption` | Consumption in last 24h | m³ | water |
+| `sensor.apavital_*_weekly_consumption` | Consumption in last 7 days | m³ | water |
+| `sensor.apavital_*_monthly_consumption` | Consumption in last 30 days | m³ | water |
 | `sensor.apavital_*_last_reading` | Timestamp of last reading | - | - |
 | `sensor.apavital_*_meter_serial` | Water meter serial number | - | - |
+| `binary_sensor.apavital_*_leak_detected` | Water leak detection | - | moisture |
+
+## 🚰 Leak Detection
+
+The integration monitors hourly water consumption and triggers an alert if it exceeds the configured threshold (default: 0.1 m³/hour ≈ 100 L/hour).
+
+To configure the threshold:
+1. Go to **Settings** → **Devices & Services** → **Apavital**
+2. Click **Configure**
+3. Adjust "Leak detection threshold"
+
+## 🔧 Services
+
+### `apavital.refresh_data`
+
+Force an immediate data refresh from the Apavital API.
+
+```yaml
+service: apavital.refresh_data
+data:
+  entry_id: "optional_specific_entry_id"  # Leave empty to refresh all
+```
+
+## ⚙️ Options
+
+After setup, you can modify settings without removing the integration:
+
+1. Go to **Settings** → **Devices & Services** → **Apavital**
+2. Click **Configure**
+3. Available options:
+   - **New JWT Token** - Update expired token
+   - **Update interval** - How often to fetch data (15-1440 minutes)
+   - **Leak threshold** - Consumption that triggers leak alert (m³/hour)
 
 ## 📱 Dashboard Cards
 
@@ -117,12 +158,26 @@ series:
 
 ## 🔐 Token Expiration
 
-The JWT token expires periodically. When your sensors show "unavailable":
+The JWT token expires periodically (usually after 1 year). When your sensors show "unavailable":
 
+### Option 1: Via UI (Recommended)
+1. Go to **Settings** → **Devices & Services** → **Apavital**
+2. Click **Configure**
+3. Paste your new JWT token
+4. Click **Submit**
+
+### Option 2: Via Reauth Flow
+When the token expires, Home Assistant will show a notification:
+1. Click "Reconfigure"
+2. Enter your new JWT token
+3. Done!
+
+### How to get a new token:
 1. Log in to https://my.apavital.ro
-2. Get a new JWT token from Developer Tools
-3. Go to **Settings** → **Devices & Services** → **Apavital**
-4. Click **Configure** and update the token
+2. Open Developer Tools (F12)
+3. Go to Network tab
+4. Find any API request
+5. Copy the `Authorization: Bearer ...` token
 
 ## 🐛 Troubleshooting
 
@@ -131,12 +186,26 @@ The JWT token expires periodically. When your sensors show "unavailable":
 - Check if your JWT token has expired
 - Verify your Client Code is correct
 - Check Home Assistant logs for errors
+- Download diagnostics: **Settings** → **Devices & Services** → **Apavital** → **⋮** → **Download diagnostics**
 
 ### No data in Energy Dashboard
 
 - Make sure the sensor has `state_class: total_increasing`
 - Wait for at least one hour for data to appear
 - Check if the sensor has historical data in Developer Tools → States
+
+### Check diagnostics
+
+The integration provides detailed diagnostics:
+1. Go to **Settings** → **Devices & Services**
+2. Click on **Apavital**
+3. Click ⋮ (three dots) → **Download diagnostics**
+
+This includes:
+- API call count
+- Last successful update
+- Error history
+- Current configuration (redacted)
 
 ## 📝 API Information
 

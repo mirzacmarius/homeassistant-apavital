@@ -12,6 +12,13 @@
           "client_code": "The GRUPMAS_COD from your consumption location (e.g., 416943)",
           "jwt_token": "Bearer token from your Apavital session"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Apavital",
+        "description": "The JWT token for {client_code} has expired. Please provide a new token.",
+        "data": {
+          "jwt_token": "New JWT Token"
+        }
       }
     },
     "error": {
@@ -20,7 +27,73 @@
       "unknown": "Unexpected error occurred"
     },
     "abort": {
-      "already_configured": "This location is already configured"
+      "already_configured": "This location is already configured",
+      "reauth_successful": "Re-authentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Apavital Options",
+        "description": "Configure integration settings. Leave JWT Token empty to keep the current token.",
+        "data": {
+          "jwt_token": "New JWT Token (optional)",
+          "scan_interval": "Update interval (minutes)",
+          "leak_threshold": "Leak detection threshold (m³/hour)"
+        },
+        "data_description": {
+          "jwt_token": "Leave empty to keep current token",
+          "scan_interval": "How often to fetch data (15-1440 minutes)",
+          "leak_threshold": "Consumption above this triggers leak alert (0.01-1.0 m³/h)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Apavital API",
+      "invalid_auth": "Invalid JWT token",
+      "unknown": "Unexpected error occurred"
+    }
+  },
+  "services": {
+    "refresh_data": {
+      "name": "Refresh Data",
+      "description": "Force refresh water consumption data from Apavital API.",
+      "fields": {
+        "entry_id": {
+          "name": "Config Entry ID",
+          "description": "Specific integration instance to refresh (optional)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_index": {
+        "name": "Water Index"
+      },
+      "water_hourly": {
+        "name": "Hourly Consumption"
+      },
+      "water_daily": {
+        "name": "Daily Consumption"
+      },
+      "water_weekly": {
+        "name": "Weekly Consumption"
+      },
+      "water_monthly": {
+        "name": "Monthly Consumption"
+      },
+      "last_reading": {
+        "name": "Last Reading"
+      },
+      "meter_serial": {
+        "name": "Meter Serial"
+      }
+    },
+    "binary_sensor": {
+      "leak_detected": {
+        "name": "Leak Detected"
+      }
     }
   }
 }

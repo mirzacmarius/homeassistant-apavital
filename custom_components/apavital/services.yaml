@@ -1,0 +1,10 @@
+refresh_data:
+  name: Refresh Data
+  description: Force refresh water consumption data from Apavital API.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: Optional. Specific integration instance to refresh. If not provided, all instances will be refreshed.
+      example: "abc123"
+      selector:
+        text:

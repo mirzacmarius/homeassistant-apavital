@@ -12,6 +12,13 @@
           "client_code": "GRUPMAS_COD din locația de consum (ex: 416943)",
           "jwt_token": "Token Bearer din sesiunea Apavital"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reautentificare Apavital",
+        "description": "Token-ul JWT pentru {client_code} a expirat. Vă rugăm să furnizați un token nou.",
+        "data": {
+          "jwt_token": "Token JWT Nou"
+        }
       }
     },
     "error": {
@@ -20,7 +27,43 @@
       "unknown": "Eroare neașteptată"
     },
     "abort": {
-      "already_configured": "Această locație este deja configurată"
+      "already_configured": "Această locație este deja configurată",
+      "reauth_successful": "Reautentificare reușită"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opțiuni Apavital",
+        "description": "Configurați setările integrării. Lăsați Token JWT gol pentru a păstra token-ul curent.",
+        "data": {
+          "jwt_token": "Token JWT Nou (opțional)",
+          "scan_interval": "Interval actualizare (minute)",
+          "leak_threshold": "Prag detectare scurgere (m³/oră)"
+        },
+        "data_description": {
+          "jwt_token": "Lăsați gol pentru a păstra token-ul curent",
+          "scan_interval": "Cât de des să preia date (15-1440 minute)",
+          "leak_threshold": "Consumul peste acest prag declanșează alertă (0.01-1.0 m³/h)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nu s-a putut conecta la API-ul Apavital",
+      "invalid_auth": "Token JWT invalid",
+      "unknown": "Eroare neașteptată"
+    }
+  },
+  "services": {
+    "refresh_data": {
+      "name": "Reîmprospătare Date",
+      "description": "Forțează reîmprospătarea datelor de consum de la API-ul Apavital.",
+      "fields": {
+        "entry_id": {
+          "name": "ID Configurație",
+          "description": "Instanța specifică de reîmprospătat (opțional)"
+        }
+      }
     }
   },
   "entity": {
@@ -28,14 +71,28 @@
       "water_index": {
         "name": "Index Contor"
       },
+      "water_hourly": {
+        "name": "Consum Orar"
+      },
       "water_daily": {
         "name": "Consum Zilnic"
       },
-      "last_update": {
+      "water_weekly": {
+        "name": "Consum Săptămânal"
+      },
+      "water_monthly": {
+        "name": "Consum Lunar"
+      },
+      "last_reading": {
         "name": "Ultima Citire"
       },
       "meter_serial": {
         "name": "Serie Contor"
+      }
+    },
+    "binary_sensor": {
+      "leak_detected": {
+        "name": "Scurgere Detectată"
       }
     }
   }
