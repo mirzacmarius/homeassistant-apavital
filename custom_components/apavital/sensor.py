@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -17,7 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
 from .coordinator import ApavitalDataUpdateCoordinator
 
 
@@ -27,6 +28,7 @@ class ApavitalSensorEntityDescription(SensorEntityDescription):
     
     value_fn: Callable[[dict[str, Any]], Any]
     extra_attrs_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    last_reset_fn: Callable[[dict[str, Any]], datetime | None] | None = None
 
 
 SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
@@ -50,7 +52,6 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         translation_key="water_hourly",
         name="Last Hour",
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
-        device_class=SensorDeviceClass.WATER,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:water-pump",
         value_fn=lambda data: data.get("consumption_hourly"),
@@ -64,6 +65,7 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         icon="mdi:water",
         value_fn=lambda data: data.get("consumption_daily"),
+        last_reset_fn=lambda data: data.get("day_start"),
     ),
     ApavitalSensorEntityDescription(
         key="water_weekly",
@@ -74,6 +76,7 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         icon="mdi:calendar-week",
         value_fn=lambda data: data.get("consumption_weekly"),
+        last_reset_fn=lambda data: data.get("week_start"),
     ),
     ApavitalSensorEntityDescription(
         key="water_monthly",
@@ -84,6 +87,7 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         icon="mdi:calendar-month",
         value_fn=lambda data: data.get("consumption_monthly"),
+        last_reset_fn=lambda data: data.get("month_start"),
     ),
     ApavitalSensorEntityDescription(
         key="leak_confidence",
@@ -106,8 +110,9 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         key="last_reading",
         translation_key="last_reading",
         name="Last Reading",
+        device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:clock-outline",
-        value_fn=lambda data: data.get("time"),
+        value_fn=lambda data: data.get("last_reading_time"),
     ),
     ApavitalSensorEntityDescription(
         key="meter_serial",
@@ -155,7 +160,7 @@ class ApavitalSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], SensorEnt
             "name": "Apavital Water Meter",
             "manufacturer": "Apavital",
             "model": "Smart Water Meter",
-            "sw_version": "1.1.0",
+            "sw_version": VERSION,
         }
     
     @property
@@ -163,6 +168,13 @@ class ApavitalSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], SensorEnt
         """Return the state of the sensor."""
         if self.coordinator.data:
             return self.entity_description.value_fn(self.coordinator.data)
+        return None
+
+    @property
+    def last_reset(self) -> datetime | None:
+        """Return when a periodic total (today, week, month) last started over."""
+        if self.coordinator.data and self.entity_description.last_reset_fn:
+            return self.entity_description.last_reset_fn(self.coordinator.data)
         return None
 
     @property
