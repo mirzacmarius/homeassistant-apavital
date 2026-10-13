@@ -10,6 +10,7 @@ from typing import Any
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -23,6 +24,8 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
+from .history import APAVITAL_TIMEZONE, parse_reading_time
+from .water_statistics import async_import_statistics, statistic_id_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,6 +71,9 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_successful_update: datetime | None = None
         self.last_error: str | None = None
         self.consecutive_errors = 0
+        self.statistic_id = statistic_id_for(self.client_code)
+        self.statistics_rows_imported = 0
+        self.last_statistics_error: str | None = None
         
         super().__init__(
             hass,
@@ -81,37 +87,39 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.api_calls_count += 1
         
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = {"Authorization": f"Bearer {self.jwt_token}"}
-                data = aiohttp.FormData()
-                data.add_field("clientCode", self.client_code)
-                data.add_field("ctrAdmin", "false")
-                data.add_field("ctrEmail", "")
-                
-                async with session.post(
-                    API_URL, 
-                    headers=headers, 
-                    data=data,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as response:
-                    if response.status == 401:
-                        self.last_error = "JWT token expired"
-                        raise ConfigEntryAuthFailed("JWT token expired. Please reconfigure the integration.")
-                    
-                    response.raise_for_status()
-                    result = await response.json()
-                    
-                    # Reset error tracking on success
-                    self.last_successful_update = datetime.now()
-                    self.consecutive_errors = 0
-                    self.last_error = None
-                    
-                    if not result.get("data"):
-                        return self._empty_data(result)
-                    
-                    readings = result["data"]
-                    return self._process_readings(readings, result)
-                    
+            session = async_get_clientsession(self.hass)
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+            data = aiohttp.FormData()
+            data.add_field("clientCode", self.client_code)
+            data.add_field("ctrAdmin", "false")
+            data.add_field("ctrEmail", "")
+
+            async with session.post(
+                API_URL,
+                headers=headers,
+                data=data,
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                if response.status == 401:
+                    self.last_error = "JWT token expired"
+                    raise ConfigEntryAuthFailed("JWT token expired. Please reconfigure the integration.")
+
+                response.raise_for_status()
+                result = await response.json()
+
+            # Reset error tracking on success
+            self.last_successful_update = datetime.now(APAVITAL_TIMEZONE)
+            self.consecutive_errors = 0
+            self.last_error = None
+
+            if not result.get("data"):
+                return self._empty_data(result)
+
+            readings = result["data"]
+            processed = self._process_readings(readings, result)
+            await self._async_update_statistics(readings)
+            return processed
+
         except ConfigEntryAuthFailed:
             raise
         except aiohttp.ClientError as err:
@@ -122,6 +130,19 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.consecutive_errors += 1
             self.last_error = str(err)
             raise UpdateFailed(f"Unexpected error: {err}") from err
+
+    async def _async_update_statistics(self, readings: list) -> None:
+        """Import hourly usage into long-term statistics without failing the update."""
+        try:
+            added = await async_import_statistics(self.hass, self.client_code, readings)
+        except Exception as err:  # noqa: BLE001 - statistics must never break the sensors
+            self.last_statistics_error = str(err)
+            _LOGGER.warning("Could not import Apavital statistics: %s", err)
+            return
+        self.last_statistics_error = None
+        self.statistics_rows_imported += added
+        if added:
+            _LOGGER.debug("Imported %s hourly water statistics rows", added)
 
     def _empty_data(self, result: dict) -> dict[str, Any]:
         """Return empty data structure."""
@@ -141,19 +162,8 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
     def _parse_reading_time(self, time_str: str) -> datetime | None:
-        """Parse reading timestamp string to datetime."""
-        if not time_str:
-            return None
-        try:
-            # Try common formats: "2024-01-15 14:00:00" or "2024-01-15T14:00:00"
-            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%d.%m.%Y %H:%M:%S"):
-                try:
-                    return datetime.strptime(time_str, fmt)
-                except ValueError:
-                    continue
-            return None
-        except Exception:
-            return None
+        """Parse reading timestamp string to a timezone-aware datetime."""
+        return parse_reading_time(time_str)
 
     def _find_reading_at_or_before(self, readings: list, target_time: datetime) -> dict | None:
         """Find the reading closest to but not after target_time."""
@@ -388,7 +398,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Process readings and calculate consumption metrics."""
         last_reading = readings[-1]
         current_index = float(last_reading["INDEX_CIT"])
-        now = datetime.now()
+        now = datetime.now(APAVITAL_TIMEZONE)
         
         # Calculate various consumption periods
         hourly_consumption = 0
@@ -442,6 +452,10 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "consumption_weekly": weekly_consumption,
             "consumption_monthly": monthly_consumption,
             "time": last_reading.get("TIME", ""),
+            "last_reading_time": self._parse_reading_time(last_reading.get("TIME", "")),
+            "day_start": today_midnight,
+            "week_start": week_start,
+            "month_start": month_start,
             "meter_serial": last_reading.get("METERSERIAL", ""),
             "average": result.get("avg", 0),
             "median": result.get("mid", 0),
@@ -470,4 +484,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "last_error": self.last_error,
             "update_interval_minutes": self.update_interval.total_seconds() / 60 if self.update_interval else None,
             "leak_threshold": self.leak_threshold,
+            "statistic_id": self.statistic_id,
+            "statistics_rows_imported": self.statistics_rows_imported,
+            "last_statistics_error": self.last_statistics_error,
         }

@@ -8,7 +8,7 @@ Home Assistant integration for monitoring water consumption from [Apavital](http
 
 ## ✨ Features
 
-- 📊 **Energy Dashboard Compatible** - Works with HA Energy Dashboard for water tracking
+- 📊 **Energy Dashboard Compatible** - Imports hourly history as long-term statistics, placed at the hour the water was used
 - 📈 **Real-time Data** - Configurable update interval (15 min - 24 hours)
 - 🚰 **Leak Detection** - Automatic alerts when consumption exceeds threshold
 - 🔔 **Multiple Sensors**:
@@ -75,8 +75,18 @@ You need two pieces of information from your Apavital account:
 
 1. Go to **Settings** → **Dashboards** → **Energy**
 2. Under **Water consumption**, click **Add water source**
-3. Select `sensor.apavital_water_meter_water_index`
+3. Select **Apavital &lt;client code&gt; water consumption** (statistic `apavital:<client_code>_water_consumption`)
 4. Save
+
+This statistic is imported hour by hour from the meter readings, so every liter is
+shown at the hour it was actually used. On the first update the integration imports
+the full history the portal provides (usually several years). Apavital publishes
+readings with a delay of several hours, and Home Assistant may be offline at times;
+neither moves consumption onto the wrong day.
+
+> Upgrading from 1.1.x: switch your Energy dashboard water source from
+> `sensor.apavital_water_meter_water_index` to the new statistic. The old sensor
+> keeps working, but it records usage at the moment Home Assistant receives it.
 
 ## 📊 Sensors
 
