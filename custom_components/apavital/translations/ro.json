@@ -39,7 +39,7 @@
         "data": {
           "jwt_token": "Token JWT Nou (opțional)",
           "scan_interval": "Interval actualizare (minute)",
-          "leak_threshold": "Prag detectare scurgere (m³/oră)"
+          "leak_threshold": "Prag detectare pierderi (m³/oră)"
         },
         "data_description": {
           "jwt_token": "Lăsați gol pentru a păstra token-ul curent",
@@ -84,7 +84,7 @@
         "name": "Consum Luna Curentă"
       },
       "leak_confidence": {
-        "name": "Încredere Scurgere"
+        "name": "Risc Pierderi"
       },
       "last_reading": {
         "name": "Ultima Citire"
@@ -95,7 +95,7 @@
     },
     "binary_sensor": {
       "leak_detected": {
-        "name": "Scurgere Detectată",
+        "name": "Pierdere Detectată",
         "state_attributes": {
           "confidence": {
             "name": "Încredere"

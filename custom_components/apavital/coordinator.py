@@ -182,7 +182,9 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         monthly_consumption = 0
         
         # Hourly (last reading vs previous)
+        hour_start = None
         if len(readings) >= 2:
+            hour_start = self._parse_reading_time(readings[-2].get("TIME", ""))
             prev_index = float(readings[-2]["INDEX_CIT"])
             hourly_consumption = round(current_index - prev_index, 4)
         
@@ -235,6 +237,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "consumption_monthly": monthly_consumption,
             "time": last_reading.get("TIME", ""),
             "last_reading_time": self._parse_reading_time(last_reading.get("TIME", "")),
+            "hour_start": hour_start,
             "day_start": today_midnight,
             "week_start": week_start,
             "month_start": month_start,

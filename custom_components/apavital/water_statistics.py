@@ -20,7 +20,6 @@ from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
-    async_change_statistics_unit,
     get_last_statistics,
     get_metadata,
     statistics_during_period,
@@ -28,6 +27,7 @@ from homeassistant.components.recorder.statistics import (
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import VolumeConverter
 
 from .const import DOMAIN
 from .history import hourly_usage, statistics_rows
@@ -69,6 +69,37 @@ def _metadata(client_code: str) -> StatisticMetaData:
     return StatisticMetaData(**metadata)
 
 
+async def _async_convert_history(
+    hass: HomeAssistant, client_code: str, stored_unit: str
+) -> int:
+    """Rewrite the whole statistic in STATISTIC_UNIT. Returns rows written."""
+    statistic_id = statistic_id_for(client_code)
+    convert = VolumeConverter.converter_factory(stored_unit, STATISTIC_UNIT)
+    history = await get_instance(hass).async_add_executor_job(
+        statistics_during_period,
+        hass,
+        datetime(2000, 1, 1, tzinfo=timezone.utc),
+        None,
+        {statistic_id},
+        "hour",
+        None,
+        {"state", "sum"},
+    )
+    rows = [
+        StatisticData(
+            start=datetime.fromtimestamp(row["start"], timezone.utc),
+            state=round(convert(row["state"]), 3) if row.get("state") is not None else None,
+            sum=round(convert(row["sum"]), 3) if row.get("sum") is not None else None,
+        )
+        for row in history.get(statistic_id, [])
+    ]
+    _LOGGER.info(
+        "Converting %s rows of %s from %s to %s", len(rows), statistic_id, stored_unit, STATISTIC_UNIT
+    )
+    async_add_external_statistics(hass, _metadata(client_code), rows)
+    return len(rows)
+
+
 async def async_import_statistics(
     hass: HomeAssistant, client_code: str, readings: list[dict]
 ) -> int:
@@ -96,16 +127,10 @@ async def async_import_statistics(
         metadata[statistic_id][1]["unit_of_measurement"] if statistic_id in metadata else None
     )
     if stored_unit is not None and stored_unit != STATISTIC_UNIT:
-        # Versions before 1.4.0 stored m³. Convert the history first; the
-        # conversion is queued in the recorder, so import on the next update.
-        _LOGGER.info("Converting %s from %s to %s", statistic_id, stored_unit, STATISTIC_UNIT)
-        await async_change_statistics_unit(
-            hass,
-            statistic_id,
-            new_unit_of_measurement=STATISTIC_UNIT,
-            old_unit_of_measurement=stored_unit,
-        )
-        return 0
+        # Versions before 1.4.0 stored m³. The recorder only converts its own
+        # statistics, so rewrite the history here; it is queued in the
+        # recorder, so new hours are imported on the next update.
+        return await _async_convert_history(hass, client_code, stored_unit)
     last = await recorder.async_add_executor_job(
         get_last_statistics, hass, 1, statistic_id, True, {"sum"}
     )
