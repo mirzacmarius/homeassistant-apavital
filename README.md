@@ -125,14 +125,16 @@ To configure the threshold (default: 0.1 m³/hour ≈ 100 L/hour):
 2. Click **Configure**
 3. Adjust "Leak detection threshold"
 
-## 🧾 Invoice Estimate
+## 🧾 Price and Invoices
 
-Every 6 hours the integration reads your invoices and the official meter readings of **every meter on your contract** (a contract can have several consumption places):
+Every 6 hours the integration reads your invoices and the official meter readings of **every meter on your contract**. One invoice covers all the consumption places of a contract, so the integration works out the price of water and applies it to **your own meter** (the smart meter it reads, or else the contract's first place):
 
-- **Last Invoice** – amount of the latest invoice (number, issue and due date, billed m³ as attributes)
-- **Next Invoice Estimate** – what the next invoice will bill
+- **Price per m³** – the latest invoice divided by the water it billed (all meters), sewage and VAT included
+- **Cost This Month** – this month's consumption × price per m³
+- **Last Invoice** – your part of the latest invoice: your meter's billed water × price per m³ (the whole invoice is in the `contract_amount` attribute)
+- **Next Invoice Estimate** – your part of the next invoice
 
-Apavital reads all meters around the same day each month and bills that water the following month, together with sewage: an invoice's quantity (`CONSUM`) is the previous month's water × a factor (1.8 for households). The integration learns the factor and the price per billed m³ from your last 3 invoices, then applies them to the readings the next invoice will bill. Until those readings exist, it uses the average of recent months (attribute `based_on: recent_average`). If the invoices can't be read, both sensors stay unknown and the water sensors keep working.
+Apavital reads all meters around the same day each month and bills that water the following month: an invoice issued in October bills the water read in September. The next invoice uses your meter's latest official reading; until that exists it uses the average of your recent months (attribute `based_on: recent_average`). If the invoices can't be read, these sensors stay unknown and the water sensors keep working.
 
 The water statistic is also kept as a copy in m³ (`apavital:<client_code>_water_consumption_m3`), for statistics graphs of months and years, which can't convert units themselves.
 

@@ -14,9 +14,12 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .billing import (
     as_list,
-    estimate_next_invoice,
+    last_invoice_share,
+    next_invoice_share,
+    own_meter,
     parse_invoices,
     parse_official_readings,
+    water_price,
 )
 from .const import (
     API_BASE,
@@ -174,32 +177,55 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.billing_fetched_at = now
         self.last_billing_error = None
 
-    def _billing_summary(self) -> dict[str, Any]:
-        """Last invoice and the estimate of the next one."""
+    def _billing_summary(self, meter_serial: str, monthly_m3: float) -> dict[str, Any]:
+        """Price per m³ and this place's part of the contract's invoices."""
         invoices = parse_invoices(self.billing_rows.get("invoices", []))
         readings = parse_official_readings(self.billing_rows.get("official_readings", []))
-        last = invoices[-1] if invoices else None
-        estimate = estimate_next_invoice(invoices, readings)
-        return {
-            "last_invoice": {
-                "amount": last.amount,
-                "number": last.number,
-                "issued": last.issued.isoformat(),
-                "due": last.due.isoformat() if last.due else None,
-                "billed_m3": last.billed_m3,
-            } if last else None,
-            "estimate": {
-                "amount": estimate.amount,
-                "expected_month": f"{estimate.month[0]}-{estimate.month[1]:02d}",
-                "water_m3": estimate.water_m3,
-                "billed_m3": estimate.billed_m3,
-                "factor": estimate.factor,
-                "price_per_billed_m3": estimate.price_per_billed_m3,
-                "price_per_water_m3": round(estimate.price_per_billed_m3 * estimate.factor, 2),
-                "based_on": "official_readings" if estimate.from_readings else "recent_average",
-                "invoices_used": estimate.invoices_used,
-            } if estimate else None,
+        price = water_price(invoices, readings)
+        meter = own_meter(readings, meter_serial, self.billing_rows.get("places", []))
+        if price is None:
+            return {"price": None, "last_invoice": None, "estimate": None, "month_cost": None}
+        invoice = price.invoice
+        summary: dict[str, Any] = {
+            "price": {
+                "per_m3": price.per_m3,
+                "invoice": invoice.number,
+                "invoice_issued": invoice.issued.isoformat(),
+                "invoice_amount": invoice.amount,
+                "invoice_water_m3": price.water_m3,
+            },
+            "last_invoice": None,
+            "estimate": None,
+            "month_cost": {
+                "amount": round(monthly_m3 * price.per_m3, 2),
+                "water_m3": monthly_m3,
+                "price_per_m3": price.per_m3,
+            },
         }
+        if meter is None:
+            return summary
+        last = last_invoice_share(price, readings, meter)
+        summary["last_invoice"] = {
+            "amount": last.amount,
+            "water_m3": last.water_m3,
+            "price_per_m3": price.per_m3,
+            "number": invoice.number,
+            "issued": invoice.issued.isoformat(),
+            "due": invoice.due.isoformat() if invoice.due else None,
+            "meter": meter,
+            "contract_amount": invoice.amount,
+            "contract_water_m3": price.water_m3,
+        }
+        estimate = next_invoice_share(price, readings, meter)
+        summary["estimate"] = {
+            "amount": estimate.amount,
+            "water_m3": estimate.water_m3,
+            "price_per_m3": price.per_m3,
+            "expected_month": f"{estimate.month[0]}-{estimate.month[1]:02d}",
+            "based_on": "official_readings" if estimate.from_readings else "recent_average",
+            "meter": meter,
+        }
+        return summary
 
     async def _async_update_statistics(self, readings: list) -> None:
         """Import hourly usage into long-term statistics without failing the update."""
@@ -349,7 +375,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "leak_avg_flow": leak_analysis.avg_hourly_flow,
             "leak_factors": leak_analysis.factors,
             "leak_awaiting_confirmation": leak_analysis.awaiting_confirmation,
-            "billing": self._billing_summary(),
+            "billing": self._billing_summary(last_reading.get("METERSERIAL", ""), monthly_consumption),
             "readings": readings[-24:],  # Keep last 24 for charts
         }
 

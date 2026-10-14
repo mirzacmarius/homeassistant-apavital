@@ -92,6 +92,12 @@
       "meter_serial": {
         "name": "Serie Contor"
       },
+      "price_per_m3": {
+        "name": "Preț pe m³"
+      },
+      "month_cost": {
+        "name": "Cost Luna Curentă"
+      },
       "last_invoice": {
         "name": "Ultima Factură"
       },
