@@ -93,8 +93,8 @@ neither moves consumption onto the wrong day.
 | Sensor | Description | Unit | Device Class |
 |--------|-------------|------|--------------|
 | `sensor.apavital_*_water_index` | Total water consumption (meter reading) | m³ | water |
-| `sensor.apavital_*_hourly_consumption` | Consumption in last hour | m³ | water |
-| `sensor.apavital_*_daily_consumption` | Consumption in last 24h | m³ | water |
+| `sensor.apavital_*_hourly_consumption` | Consumption in last hour | L | volume |
+| `sensor.apavital_*_daily_consumption` | Consumption since midnight | L | water |
 | `sensor.apavital_*_weekly_consumption` | Consumption in last 7 days | m³ | water |
 | `sensor.apavital_*_monthly_consumption` | Consumption in last 30 days | m³ | water |
 | `sensor.apavital_*_last_reading` | Timestamp of last reading | - | - |
