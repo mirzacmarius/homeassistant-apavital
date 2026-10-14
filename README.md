@@ -103,9 +103,20 @@ neither moves consumption onto the wrong day.
 
 ## 🚰 Leak Detection
 
-The integration monitors hourly water consumption and triggers an alert if it exceeds the configured threshold (default: 0.1 m³/hour ≈ 100 L/hour).
+The leak sensor scores the last 12 hours of consumption (50 of 90 points means a suspected leak):
 
-To configure the threshold:
+| Signal | Points |
+|--------|--------|
+| 6+ consecutive hours above 5 L/h (leaks don't stop) | up to 30 |
+| Constant flow (low coefficient of variation) | up to 25 |
+| Consumption between 01:00 and 05:00 | 20 |
+| Average flow above the leak threshold | 15 |
+
+A suspected leak only turns the sensor on once a **newer meter reading confirms it**. After an outage the Apavital portal can serve estimated readings that spread the missing usage evenly over the gap. That looks exactly like a leak and is replaced by real readings later, so it no longer raises false alarms. While waiting, the sensor's `awaiting_confirmation` attribute is `true`.
+
+Hours the portal revises within the last 7 days are also rewritten in the long-term statistics, so the Energy dashboard shows the real readings instead of the estimates.
+
+To configure the threshold (default: 0.1 m³/hour ≈ 100 L/hour):
 1. Go to **Settings** → **Devices & Services** → **Apavital**
 2. Click **Configure**
 3. Adjust "Leak detection threshold"
