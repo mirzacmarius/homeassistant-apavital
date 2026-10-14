@@ -34,7 +34,5 @@ async def async_get_config_entry_diagnostics(
         "config_entry": async_redact_data(entry.as_dict(), TO_REDACT),
         "coordinator": coordinator.diagnostics_data,
         "data": async_redact_data(coordinator.data or {}, TO_REDACT) if coordinator.data else None,
-        "billing_rows": async_redact_data(
-            {key: rows[-12:] for key, rows in coordinator.billing_rows.items()}, TO_REDACT
-        ),
+        "billing_rows": async_redact_data(coordinator.billing_rows, TO_REDACT),
     }
