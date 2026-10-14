@@ -84,6 +84,10 @@ the full history the portal provides (usually several years). Apavital publishes
 readings with a delay of several hours, and Home Assistant may be offline at times;
 neither moves consumption onto the wrong day.
 
+The statistic is stored in litres, so the Energy dashboard shows water in litres.
+Upgrading from 1.3.x converts the existing history from m³ automatically; the
+first update after the upgrade only converts, and new hours follow on the next one.
+
 > Upgrading from 1.1.x: switch your Energy dashboard water source from
 > `sensor.apavital_water_meter_water_index` to the new statistic. The old sensor
 > keeps working, but it records usage at the moment Home Assistant receives it.
