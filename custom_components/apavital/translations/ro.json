@@ -91,6 +91,12 @@
       },
       "meter_serial": {
         "name": "Serie Contor"
+      },
+      "last_invoice": {
+        "name": "Ultima Factură"
+      },
+      "invoice_estimate": {
+        "name": "Factură Estimată"
       }
     },
     "binary_sensor": {

@@ -12,7 +12,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
+from .billing import (
+    as_list,
+    estimate_next_invoice,
+    parse_invoices,
+    parse_official_readings,
+)
 from .const import (
+    API_BASE,
     API_URL,
     CONF_CLIENT_CODE,
     CONF_JWT_TOKEN,
@@ -27,6 +34,9 @@ from .leak import LeakConfirmation, analyze_leak_pattern
 from .water_statistics import async_import_statistics, statistic_id_for
 
 _LOGGER = logging.getLogger(__name__)
+
+# Invoices and official readings change about once a month.
+BILLING_REFRESH = timedelta(hours=6)
 
 
 class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -51,6 +61,9 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.statistics_rows_imported = 0
         self.last_statistics_error: str | None = None
         self.leak_confirmation = LeakConfirmation()
+        self.billing_rows: dict[str, list[dict]] = {}
+        self.billing_fetched_at: datetime | None = None
+        self.last_billing_error: str | None = None
         
         super().__init__(
             hass,
@@ -93,6 +106,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return self._empty_data(result)
 
             readings = result["data"]
+            await self._async_update_billing(session)
             processed = self._process_readings(readings, result)
             await self._async_update_statistics(readings)
             return processed
@@ -107,6 +121,79 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.consecutive_errors += 1
             self.last_error = str(err)
             raise UpdateFailed(f"Unexpected error: {err}") from err
+
+    async def _async_api(
+        self, session: aiohttp.ClientSession, path: str, page: str, label: str, payload: dict | None = None
+    ) -> Any:
+        """Call a My Apavital endpoint the way the web portal does."""
+        context = {"ctrAdmin": False, "ctrEmail": "", "pageName": page, "pageLabel": label}
+        headers = {"Authorization": f"Bearer {self.jwt_token}", "Accept": "application/json"}
+        timeout = aiohttp.ClientTimeout(total=60)
+        if payload is None:
+            params = {**context, "ctrAdmin": "false"}
+            request = session.get(f"{API_BASE}/{path}", headers=headers, params=params, timeout=timeout)
+        else:
+            request = session.post(
+                f"{API_BASE}/{path}", headers=headers, json={**payload, **context}, timeout=timeout
+            )
+        async with request as response:
+            response.raise_for_status()
+            return await response.json(content_type=None)
+
+    async def _async_update_billing(self, session: aiohttp.ClientSession) -> None:
+        """Fetch invoices and official readings; never fails the update."""
+        now = datetime.now(APAVITAL_TIMEZONE)
+        if self.billing_fetched_at and now - self.billing_fetched_at < BILLING_REFRESH:
+            return
+        try:
+            contracts = as_list(await self._async_api(session, "asocieri", "/evidenta_facturi", "Facturi"))
+            contract = next(
+                (c for c in contracts if str(c.get("COD_CLIENT")) == str(self.client_code)),
+                contracts[0] if contracts else None,
+            )
+            invoices: list[dict] = []
+            if contract is not None:
+                invoices = as_list(
+                    await self._async_api(
+                        session,
+                        "facturi",
+                        "/evidenta_facturi",
+                        "Facturi",
+                        {"contract": contract.get("COD_CLIENT"), "loc_con_id": contract.get("ID")},
+                    )
+                )
+            official = as_list(
+                await self._async_api(session, "index_history_last_year", "/istoric_citiri", "Istoric Citiri")
+            )
+        except Exception as err:  # noqa: BLE001 - billing is optional
+            self.last_billing_error = str(err)
+            _LOGGER.debug("Apavital invoices unavailable: %s", err)
+            return
+        self.billing_rows = {"invoices": invoices, "official_readings": official}
+        self.billing_fetched_at = now
+        self.last_billing_error = None
+
+    def _billing_summary(self, current_index: float) -> dict[str, Any]:
+        """Last invoice and the estimate of the next one."""
+        invoices = parse_invoices(self.billing_rows.get("invoices", []))
+        readings = parse_official_readings(self.billing_rows.get("official_readings", []))
+        last = invoices[-1] if invoices else None
+        estimate = estimate_next_invoice(invoices, readings, current_index)
+        return {
+            "last_invoice": {
+                "amount": last.amount,
+                "number": last.number,
+                "issued": last.issued.isoformat(),
+                "due": last.due.isoformat() if last.due else None,
+            } if last else None,
+            "estimate": {
+                "amount": estimate.amount,
+                "price_per_m3": estimate.price_per_m3,
+                "consumption_m3": estimate.consumption_m3,
+                "since": estimate.since.isoformat(),
+                "invoices_used": estimate.invoices_used,
+            } if estimate else None,
+        }
 
     async def _async_update_statistics(self, readings: list) -> None:
         """Import hourly usage into long-term statistics without failing the update."""
@@ -256,6 +343,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "leak_avg_flow": leak_analysis.avg_hourly_flow,
             "leak_factors": leak_analysis.factors,
             "leak_awaiting_confirmation": leak_analysis.awaiting_confirmation,
+            "billing": self._billing_summary(current_index),
             "readings": readings[-24:],  # Keep last 24 for charts
         }
 
@@ -273,4 +361,6 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "statistic_id": self.statistic_id,
             "statistics_rows_imported": self.statistics_rows_imported,
             "last_statistics_error": self.last_statistics_error,
+            "billing_fetched_at": self.billing_fetched_at.isoformat() if self.billing_fetched_at else None,
+            "last_billing_error": self.last_billing_error,
         }

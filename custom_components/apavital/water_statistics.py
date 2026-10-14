@@ -52,13 +52,23 @@ def statistic_id_for(client_code: str) -> str:
     return f"{DOMAIN}:{client_code.lower()}_water_consumption"
 
 
-def _metadata(client_code: str) -> StatisticMetaData:
+def m3_statistic_id_for(client_code: str) -> str:
+    """Return the id of the m³ copy, for charts of long periods.
+
+    Statistic cards and graphs can't convert units of external statistics, so
+    a copy in m³ lets monthly and yearly charts read 8 m³ instead of 8.000 L.
+    """
+    return f"{statistic_id_for(client_code)}_m3"
+
+
+def _metadata(client_code: str, unit: str = STATISTIC_UNIT) -> StatisticMetaData:
+    m3 = unit == UnitOfVolume.CUBIC_METERS
     metadata: dict = {
         "has_sum": True,
-        "name": f"Apavital {client_code} water consumption",
+        "name": f"Apavital {client_code} water consumption" + (" (m³)" if m3 else ""),
         "source": DOMAIN,
-        "statistic_id": statistic_id_for(client_code),
-        "unit_of_measurement": STATISTIC_UNIT,
+        "statistic_id": m3_statistic_id_for(client_code) if m3 else statistic_id_for(client_code),
+        "unit_of_measurement": unit,
     }
     if StatisticMeanType is not None:
         metadata["mean_type"] = StatisticMeanType.NONE
@@ -166,4 +176,53 @@ async def async_import_statistics(
     if rows:
         _LOGGER.debug("Writing %s hourly rows to %s", len(rows), statistic_id)
         async_add_external_statistics(hass, _metadata(client_code), rows)
+    await _async_mirror_m3(hass, client_code, rows)
     return len(rows)
+
+
+async def _async_mirror_m3(
+    hass: HomeAssistant, client_code: str, rows: list[StatisticData]
+) -> None:
+    """Write the rows to the m³ copy, seeding it from the full history once."""
+    m3_id = m3_statistic_id_for(client_code)
+    recorder = get_instance(hass)
+    last = await recorder.async_add_executor_job(
+        get_last_statistics, hass, 1, m3_id, True, {"sum"}
+    )
+    if not last.get(m3_id):
+        history = await recorder.async_add_executor_job(
+            statistics_during_period,
+            hass,
+            datetime(2000, 1, 1, tzinfo=timezone.utc),
+            None,
+            {statistic_id_for(client_code)},
+            "hour",
+            None,
+            {"state", "sum"},
+        )
+        seeded = {
+            row["start"]: StatisticData(
+                start=datetime.fromtimestamp(row["start"], timezone.utc),
+                state=row.get("state"),
+                sum=row.get("sum"),
+            )
+            for row in history.get(statistic_id_for(client_code), [])
+        }
+        rows = list(seeded.values()) + [
+            row for row in rows if row["start"].timestamp() not in seeded
+        ]
+    if not rows:
+        return
+    to_m3 = VolumeConverter.converter_factory(STATISTIC_UNIT, UnitOfVolume.CUBIC_METERS)
+    async_add_external_statistics(
+        hass,
+        _metadata(client_code, UnitOfVolume.CUBIC_METERS),
+        [
+            StatisticData(
+                start=row["start"],
+                state=round(to_m3(row["state"]), 6) if row.get("state") is not None else None,
+                sum=round(to_m3(row["sum"]), 6) if row.get("sum") is not None else None,
+            )
+            for row in rows
+        ],
+    )

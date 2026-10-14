@@ -10,7 +10,18 @@ from homeassistant.core import HomeAssistant
 from .const import CONF_CLIENT_CODE, CONF_JWT_TOKEN, DOMAIN
 from .coordinator import ApavitalDataUpdateCoordinator
 
-TO_REDACT = {CONF_JWT_TOKEN, CONF_CLIENT_CODE, "meter_serial"}
+TO_REDACT = {
+    CONF_JWT_TOKEN,
+    CONF_CLIENT_CODE,
+    "meter_serial",
+    "ADRESA",
+    "NUME",
+    "CNP",
+    "EMAIL",
+    "TELEFON",
+    "COD_CLIENT",
+    "CONTRACT",
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -23,4 +34,7 @@ async def async_get_config_entry_diagnostics(
         "config_entry": async_redact_data(entry.as_dict(), TO_REDACT),
         "coordinator": coordinator.diagnostics_data,
         "data": async_redact_data(coordinator.data or {}, TO_REDACT) if coordinator.data else None,
+        "billing_rows": async_redact_data(
+            {key: rows[-12:] for key, rows in coordinator.billing_rows.items()}, TO_REDACT
+        ),
     }

@@ -91,6 +91,12 @@
       },
       "meter_serial": {
         "name": "Meter Serial"
+      },
+      "last_invoice": {
+        "name": "Last Invoice"
+      },
+      "invoice_estimate": {
+        "name": "Next Invoice Estimate"
       }
     },
     "binary_sensor": {

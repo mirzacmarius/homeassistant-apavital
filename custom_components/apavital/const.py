@@ -1,7 +1,7 @@
 """Constants for the Apavital integration."""
 
 DOMAIN = "apavital"
-VERSION = "1.2.0"
+VERSION = "1.5.0"
 
 CONF_CLIENT_CODE = "client_code"
 CONF_JWT_TOKEN = "jwt_token"
@@ -10,6 +10,7 @@ CONF_SCAN_INTERVAL = "scan_interval"
 
 API_URL = "https://my.apavital.ro/api/get_usage"
 API_LOCATIONS_URL = "https://my.apavital.ro/api/locuriCons"
+API_BASE = "https://my.apavital.ro/api"
 
 ATTR_INDEX = "index"
 ATTR_CONSUMPTION = "consumption"

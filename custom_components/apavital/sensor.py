@@ -119,6 +119,36 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         value_fn=lambda data: data.get("last_reading_time"),
     ),
     ApavitalSensorEntityDescription(
+        key="last_invoice",
+        translation_key="last_invoice",
+        name="Last Invoice",
+        native_unit_of_measurement="RON",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:receipt-text",
+        value_fn=lambda data: ((data.get("billing") or {}).get("last_invoice") or {}).get("amount"),
+        extra_attrs_fn=lambda data: {
+            key: value
+            for key, value in ((data.get("billing") or {}).get("last_invoice") or {}).items()
+            if key != "amount"
+        },
+    ),
+    ApavitalSensorEntityDescription(
+        key="invoice_estimate",
+        translation_key="invoice_estimate",
+        name="Next Invoice Estimate",
+        native_unit_of_measurement="RON",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:receipt-text-clock",
+        value_fn=lambda data: ((data.get("billing") or {}).get("estimate") or {}).get("amount"),
+        extra_attrs_fn=lambda data: {
+            key: value
+            for key, value in ((data.get("billing") or {}).get("estimate") or {}).items()
+            if key != "amount"
+        },
+    ),
+    ApavitalSensorEntityDescription(
         key="meter_serial",
         translation_key="meter_serial",
         name="Meter Serial",
