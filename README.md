@@ -127,12 +127,12 @@ To configure the threshold (default: 0.1 m³/hour ≈ 100 L/hour):
 
 ## 🧾 Invoice Estimate
 
-Every 6 hours the integration reads your invoices and the official meter readings Apavital bills from:
+Every 6 hours the integration reads your invoices and the official meter readings of **every meter on your contract** (a contract can have several consumption places):
 
-- **Last Invoice** – amount of the latest invoice (number, issue and due date as attributes)
-- **Next Invoice Estimate** – water used since the last official reading × your price per m³
+- **Last Invoice** – amount of the latest invoice (number, issue and due date, billed m³ as attributes)
+- **Next Invoice Estimate** – what the next invoice will bill
 
-The price per m³ is the median of your last 3 invoices divided by the m³ each one billed, so it includes sewage, fees and VAT as Apavital charges them. If the invoices can't be read, both sensors stay unknown and the water sensors keep working.
+Apavital reads all meters around the same day each month and bills that water the following month, together with sewage: an invoice's quantity (`CONSUM`) is the previous month's water × a factor (1.8 for households). The integration learns the factor and the price per billed m³ from your last 3 invoices, then applies them to the readings the next invoice will bill. Until those readings exist, it uses the average of recent months (attribute `based_on: recent_average`). If the invoices can't be read, both sensors stay unknown and the water sensors keep working.
 
 The water statistic is also kept as a copy in m³ (`apavital:<client_code>_water_consumption_m3`), for statistics graphs of months and years, which can't convert units themselves.
 

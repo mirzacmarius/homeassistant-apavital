@@ -16,24 +16,33 @@ billing = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = billing
 _SPEC.loader.exec_module(billing)
 
-INVOICES = [
-    {"FACTURA": "A1", "DATA": "05.08.2026", "SCADENTA": "05.09.2026", "VALOARE": "150,00"},
-    {"FACTURA": "A2", "DATA": "05.09.2026", "SCADENTA": "05.10.2026", "VALOARE": "151,50"},
-    {"FACTURA": "A3", "DATA": "06.10.2026", "SCADENTA": "06.11.2026", "VALOARE": "80,80"},
-]
+REGULAR = "Citire de regularizare"
+MOVE = "Citire la miscare contor"
+
+
+def reading(day: str, meter: str, index: str, kind: str = REGULAR) -> dict:
+    return {"DATA": day, "SERIA": meter, "INDEX_CITIT": index, "TIP_CITIRE": kind}
+
+
+# Two meters read on the 4th; each invoice bills the previous month's reading × 1.8.
 READINGS = [
-    {"DATA": "01.07.2026", "INDEX_CITIT": "40"},
-    {"DATA": "01.08.2026", "INDEX_CITIT": "50"},  # 10 m³ -> 150 RON
-    {"DATA": "01.09.2026", "INDEX_CITIT": "60"},  # 10 m³ -> 151.5 RON
-    {"DATA": "01.10.2026", "INDEX_CITIT": "65,5"},  # 5.5 m³ -> 80.8 RON
+    reading("04.07.2026", "A", "10"), reading("04.07.2026", "B", "100"),
+    reading("04.08.2026", "A", "20"), reading("04.08.2026", "B", "110"),  # 20 m³
+    reading("04.09.2026", "A", "26"), reading("04.09.2026", "B", "120"),  # 16 m³
+    reading("04.10.2026", "A", "40"), reading("04.10.2026", "B", "130"),  # 24 m³
+]
+INVOICES = [
+    {"FACTURA": "F1", "DATA": "10.09.2026", "SCADENTA": "25.09.2026", "CONSUM": "36", "VALOARE": "429.48"},
+    {"FACTURA": "F2", "DATA": "12.10.2026", "SCADENTA": "27.10.2026", "CONSUM": "28.8", "VALOARE": "343.58"},
 ]
 
 
 class ParseTest(unittest.TestCase):
     def test_amounts(self) -> None:
         self.assertEqual(billing.parse_amount("1.234,56"), 1234.56)
+        self.assertEqual(billing.parse_amount("1,194.93"), 1194.93)
         self.assertEqual(billing.parse_amount("123,45"), 123.45)
-        self.assertEqual(billing.parse_amount("123.45"), 123.45)
+        self.assertEqual(billing.parse_amount("607.80"), 607.8)
         self.assertEqual(billing.parse_amount(42), 42.0)
         self.assertIsNone(billing.parse_amount("n/a"))
 
@@ -42,11 +51,25 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(billing.parse_date("2026-10-05T00:00:00"), date(2026, 10, 5))
         self.assertIsNone(billing.parse_date("soon"))
 
-    def test_wrapped_and_unsorted_rows(self) -> None:
-        rows = billing.as_list({"data": list(reversed(INVOICES)) + ["junk"]})
-        invoices = billing.parse_invoices(rows)
-        self.assertEqual([i.number for i in invoices], ["A1", "A2", "A3"])
-        self.assertEqual(invoices[-1].due, date(2026, 11, 6))
+    def test_wrapped_and_unsorted_invoices(self) -> None:
+        invoices = billing.parse_invoices(billing.as_list({"data": list(reversed(INVOICES)) + ["x"]}))
+        self.assertEqual([i.number for i in invoices], ["F1", "F2"])
+        self.assertEqual(invoices[-1].billed_m3, 28.8)
+
+
+class WaterByReadingMonthTest(unittest.TestCase):
+    def test_sums_meters_per_reading_month(self) -> None:
+        water = billing.water_by_reading_month(billing.parse_official_readings(READINGS))
+        self.assertEqual(water, {(2026, 8): 20.0, (2026, 9): 16.0, (2026, 10): 24.0})
+
+    def test_meter_replacement_keeps_both_meters_usage(self) -> None:
+        readings = billing.parse_official_readings([
+            reading("14.03.2026", "A", "932"),
+            reading("23.03.2026", "A", "0", MOVE),
+            reading("23.03.2026", "A", "934", MOVE),
+            reading("16.04.2026", "A", "6"),
+        ])
+        self.assertEqual(billing.water_by_reading_month(readings), {(2026, 4): 8.0})
 
 
 class EstimateTest(unittest.TestCase):
@@ -54,22 +77,23 @@ class EstimateTest(unittest.TestCase):
         self.invoices = billing.parse_invoices(INVOICES)
         self.readings = billing.parse_official_readings(READINGS)
 
-    def test_price_per_m3_from_recent_invoices(self) -> None:
-        prices = billing.billed_prices(self.invoices, self.readings)
-        self.assertEqual([round(p, 2) for p in prices], [14.69, 15.15, 15.0])
+    def test_next_invoice_bills_last_reading_month(self) -> None:
+        estimate = billing.estimate_next_invoice(self.invoices, self.readings)
+        self.assertEqual(estimate.month, (2026, 11))
+        self.assertTrue(estimate.from_readings)
+        self.assertEqual(estimate.water_m3, 24.0)
+        self.assertEqual(estimate.factor, 1.8)
+        self.assertEqual(estimate.billed_m3, 43.2)
+        self.assertAlmostEqual(estimate.amount, 43.2 * 11.93, places=1)
 
-    def test_estimate_since_last_official_reading(self) -> None:
-        estimate = billing.estimate_next_invoice(self.invoices, self.readings, 65.82)
-        self.assertEqual(estimate.since, date(2026, 10, 1))
-        self.assertEqual(estimate.price_per_m3, 15.0)  # median
-        self.assertEqual(estimate.consumption_m3, 0.32)
-        self.assertEqual(estimate.amount, 4.8)
-        self.assertEqual(estimate.invoices_used, 3)
+    def test_falls_back_to_recent_average_before_readings(self) -> None:
+        estimate = billing.estimate_next_invoice(self.invoices, self.readings[:-2])
+        self.assertFalse(estimate.from_readings)
+        self.assertEqual(estimate.water_m3, 18.0)
 
-    def test_no_estimate_without_billed_quantity(self) -> None:
-        readings = billing.parse_official_readings(READINGS[:1])
-        self.assertIsNone(billing.estimate_next_invoice(self.invoices, readings, 65.82))
-        self.assertIsNone(billing.estimate_next_invoice(self.invoices, self.readings, None))
+    def test_no_estimate_without_matching_readings(self) -> None:
+        self.assertIsNone(billing.estimate_next_invoice(self.invoices, []))
+        self.assertIsNone(billing.estimate_next_invoice([], self.readings))
 
 
 if __name__ == "__main__":
