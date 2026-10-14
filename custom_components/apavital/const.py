@@ -1,7 +1,7 @@
 """Constants for the Apavital integration."""
 
 DOMAIN = "apavital"
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 CONF_CLIENT_CODE = "client_code"
 CONF_JWT_TOKEN = "jwt_token"

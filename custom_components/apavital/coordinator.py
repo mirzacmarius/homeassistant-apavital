@@ -146,6 +146,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.billing_fetched_at and now - self.billing_fetched_at < BILLING_REFRESH:
             return
         try:
+            places = as_list(await self._async_api(session, "locuriCons", "/istoric_consum", "Istoric Consum"))
             contracts = as_list(await self._async_api(session, "asocieri", "/evidenta_facturi", "Facturi"))
             contract = next(
                 (c for c in contracts if str(c.get("COD_CLIENT")) == str(self.client_code)),
@@ -169,7 +170,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.last_billing_error = str(err)
             _LOGGER.debug("Apavital invoices unavailable: %s", err)
             return
-        self.billing_rows = {"invoices": invoices, "official_readings": official}
+        self.billing_rows = {"places": places, "contracts": contracts, "invoices": invoices, "official_readings": official}
         self.billing_fetched_at = now
         self.last_billing_error = None
 
