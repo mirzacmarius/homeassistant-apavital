@@ -35,9 +35,11 @@ class ApavitalLeakSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], Binar
     This sensor uses multiple factors to detect leaks:
     - Consecutive hours with non-zero consumption
     - Coefficient of variation (low = constant flow = leak)
-    - R² score (high linearity = constant flow = leak)
     - Night-time consumption (very suspicious)
     - Average hourly flow rate
+
+    A suspected leak turns the sensor on only once a newer meter reading
+    confirms it, so estimated readings after a data gap don't raise alarms.
     """
     
     _attr_has_entity_name = True
@@ -87,6 +89,7 @@ class ApavitalLeakSensor(CoordinatorEntity[ApavitalDataUpdateCoordinator], Binar
             "r_squared": data.get("leak_r_squared"),
             "night_consumption": data.get("leak_night_consumption", False),
             "average_hourly_flow": data.get("leak_avg_flow", 0),
+            "awaiting_confirmation": data.get("leak_awaiting_confirmation", False),
         }
         
         # Add detailed factors if available (for debugging/advanced users)

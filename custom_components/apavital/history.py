@@ -78,3 +78,67 @@ def hourly_usage(readings: list[dict], tz: tzinfo = APAVITAL_TIMEZONE) -> list[H
             index=index,
         )
     return [hours[key] for key in sorted(hours)]
+
+
+def statistics_rows(
+    usage: list[HourlyUsage],
+    stored: dict[float, float],
+    last_start: float | None,
+    revise_from: float,
+) -> list[tuple[HourlyUsage, float]]:
+    """Plan the (hour, running sum) statistics rows to write.
+
+    Hours newer than the last stored hour (`last_start`) are appended. Stored
+    hours starting at or after `revise_from` are rewritten when the portal has
+    since changed them, which happens when estimated readings that filled a
+    data gap are replaced by real ones.
+
+    `stored` maps the start timestamp of already stored hours to their sum. It
+    must include the stored hour right before the revised range so the running
+    sum can continue from it; without it only new hours are appended.
+    """
+    if not usage:
+        return []
+    if last_start is None:
+        rows, running = [], 0.0
+        for hour in usage:
+            running = round(running + hour.consumption, 4)
+            rows.append((hour, running))
+        return rows
+
+    starts = [h.start.timestamp() for h in usage]
+    window_start = min((s for s in starts if s > last_start or s >= revise_from), default=None)
+    if window_start is None:
+        return []
+    anchors = [start for start in stored if start < window_start]
+    if not anchors:
+        window_start = min((s for s in starts if s > last_start), default=None)
+        anchors = [last_start] if last_start in stored else []
+        if window_start is None or not anchors:
+            return []
+    running = stored[max(anchors)]
+
+    # Stored hours the portal no longer reports used no water; rewrite them too
+    # so the running sum stays consistent.
+    by_start = {h.start.timestamp(): h for h in usage if h.start.timestamp() >= window_start}
+    starts = sorted(set(by_start) | {s for s in stored if window_start <= s <= starts[-1]})
+
+    first = by_start[min(by_start)]
+    index = round(first.index - first.consumption, 4)
+    rows: list[tuple[HourlyUsage, float]] = []
+    changed = False
+    for start in starts:
+        hour = by_start.get(start)
+        if hour is None:
+            hour = HourlyUsage(
+                start=datetime.fromtimestamp(start, ZoneInfo("UTC")),
+                consumption=0.0,
+                index=index,
+            )
+        index = hour.index
+        running = round(running + hour.consumption, 4)
+        if not changed and start in stored and abs(stored[start] - running) < 1e-6:
+            continue
+        changed = True
+        rows.append((hour, running))
+    return rows
