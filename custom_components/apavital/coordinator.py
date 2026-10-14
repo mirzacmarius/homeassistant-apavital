@@ -174,24 +174,29 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.billing_fetched_at = now
         self.last_billing_error = None
 
-    def _billing_summary(self, current_index: float) -> dict[str, Any]:
+    def _billing_summary(self) -> dict[str, Any]:
         """Last invoice and the estimate of the next one."""
         invoices = parse_invoices(self.billing_rows.get("invoices", []))
         readings = parse_official_readings(self.billing_rows.get("official_readings", []))
         last = invoices[-1] if invoices else None
-        estimate = estimate_next_invoice(invoices, readings, current_index)
+        estimate = estimate_next_invoice(invoices, readings)
         return {
             "last_invoice": {
                 "amount": last.amount,
                 "number": last.number,
                 "issued": last.issued.isoformat(),
                 "due": last.due.isoformat() if last.due else None,
+                "billed_m3": last.billed_m3,
             } if last else None,
             "estimate": {
                 "amount": estimate.amount,
-                "price_per_m3": estimate.price_per_m3,
-                "consumption_m3": estimate.consumption_m3,
-                "since": estimate.since.isoformat(),
+                "expected_month": f"{estimate.month[0]}-{estimate.month[1]:02d}",
+                "water_m3": estimate.water_m3,
+                "billed_m3": estimate.billed_m3,
+                "factor": estimate.factor,
+                "price_per_billed_m3": estimate.price_per_billed_m3,
+                "price_per_water_m3": round(estimate.price_per_billed_m3 * estimate.factor, 2),
+                "based_on": "official_readings" if estimate.from_readings else "recent_average",
                 "invoices_used": estimate.invoices_used,
             } if estimate else None,
         }
@@ -344,7 +349,7 @@ class ApavitalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "leak_avg_flow": leak_analysis.avg_hourly_flow,
             "leak_factors": leak_analysis.factors,
             "leak_awaiting_confirmation": leak_analysis.awaiting_confirmation,
-            "billing": self._billing_summary(current_index),
+            "billing": self._billing_summary(),
             "readings": readings[-24:],  # Keep last 24 for charts
         }
 
