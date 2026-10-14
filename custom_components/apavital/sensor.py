@@ -53,10 +53,11 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         name="Last Hour",
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         suggested_unit_of_measurement=UnitOfVolume.LITERS,
-        device_class=SensorDeviceClass.VOLUME,
-        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL,
         icon="mdi:water-pump",
         value_fn=lambda data: data.get("consumption_hourly"),
+        last_reset_fn=lambda data: data.get("hour_start"),
     ),
     ApavitalSensorEntityDescription(
         key="water_daily",
