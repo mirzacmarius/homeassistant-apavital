@@ -72,28 +72,51 @@ class WaterByReadingMonthTest(unittest.TestCase):
         self.assertEqual(billing.water_by_reading_month(readings), {(2026, 4): 8.0})
 
 
-class EstimateTest(unittest.TestCase):
+class PriceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.invoices = billing.parse_invoices(INVOICES)
         self.readings = billing.parse_official_readings(READINGS)
 
-    def test_next_invoice_bills_last_reading_month(self) -> None:
-        estimate = billing.estimate_next_invoice(self.invoices, self.readings)
-        self.assertEqual(estimate.month, (2026, 11))
+    def test_price_per_m3_from_latest_invoice(self) -> None:
+        # F2 bills September's 16 m³ of both meters.
+        price = billing.water_price(self.invoices, self.readings)
+        self.assertEqual(price.invoice.number, "F2")
+        self.assertEqual(price.water_m3, 16.0)
+        self.assertAlmostEqual(price.per_m3, 343.58 / 16, places=4)
+
+    def test_price_falls_back_to_older_invoice(self) -> None:
+        price = billing.water_price(self.invoices, self.readings[:4])
+        self.assertEqual(price.invoice.number, "F1")
+        self.assertIsNone(billing.water_price(self.invoices, []))
+        self.assertIsNone(billing.water_price([], self.readings))
+
+    def test_shares_of_one_meter(self) -> None:
+        price = billing.water_price(self.invoices, self.readings)
+        last = billing.last_invoice_share(price, self.readings, "A")
+        self.assertEqual((last.water_m3, last.month), (6.0, (2026, 10)))
+        self.assertAlmostEqual(last.amount, 6 * 343.58 / 16, places=2)
+        estimate = billing.next_invoice_share(price, self.readings, "A")
+        self.assertEqual((estimate.water_m3, estimate.month), (14.0, (2026, 11)))
         self.assertTrue(estimate.from_readings)
-        self.assertEqual(estimate.water_m3, 24.0)
-        self.assertEqual(estimate.factor, 1.8)
-        self.assertEqual(estimate.billed_m3, 43.2)
-        self.assertAlmostEqual(estimate.amount, 43.2 * 11.93, places=1)
 
-    def test_falls_back_to_recent_average_before_readings(self) -> None:
-        estimate = billing.estimate_next_invoice(self.invoices, self.readings[:-2])
+    def test_estimate_falls_back_to_recent_average(self) -> None:
+        price = billing.water_price(self.invoices, self.readings)
+        estimate = billing.next_invoice_share(price, self.readings[:-2], "A")
         self.assertFalse(estimate.from_readings)
-        self.assertEqual(estimate.water_m3, 18.0)
+        self.assertEqual(estimate.water_m3, 8.0)  # average of 10 and 6
 
-    def test_no_estimate_without_matching_readings(self) -> None:
-        self.assertIsNone(billing.estimate_next_invoice(self.invoices, []))
-        self.assertIsNone(billing.estimate_next_invoice([], self.readings))
+
+class OwnMeterTest(unittest.TestCase):
+    def test_smart_meter_then_first_place(self) -> None:
+        readings = billing.parse_official_readings([
+            {**reading("04.10.2026", "A", "1"), "ADRESA": "Str. Unu 1"},
+            {**reading("04.10.2026", "B", "1"), "ADRESA": "Str. Doi 2"},
+        ])
+        places = [{"LOCCONS_NR": "2", "ADRESA": "Str. Doi 2"}, {"LOCCONS_NR": "1", "ADRESA": "Str. Unu 1"}]
+        self.assertEqual(billing.own_meter(readings, "B", places), "B")
+        self.assertEqual(billing.own_meter(readings, "X", places), "A")
+        self.assertIsNone(billing.own_meter(readings, "", []))
+        self.assertEqual(billing.own_meter(readings[:1], "", []), "A")
 
 
 if __name__ == "__main__":

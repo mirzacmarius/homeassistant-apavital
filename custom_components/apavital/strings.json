@@ -92,6 +92,12 @@
       "meter_serial": {
         "name": "Meter Serial"
       },
+      "price_per_m3": {
+        "name": "Price per m³"
+      },
+      "month_cost": {
+        "name": "Cost This Month"
+      },
       "last_invoice": {
         "name": "Last Invoice"
       },

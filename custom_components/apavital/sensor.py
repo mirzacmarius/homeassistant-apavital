@@ -31,6 +31,16 @@ class ApavitalSensorEntityDescription(SensorEntityDescription):
     last_reset_fn: Callable[[dict[str, Any]], datetime | None] | None = None
 
 
+def _billing(data: dict[str, Any], key: str) -> dict[str, Any]:
+    """One part of the billing summary, empty when it is unavailable."""
+    return (data.get("billing") or {}).get(key) or {}
+
+
+def _billing_attrs(data: dict[str, Any], key: str, state_key: str) -> dict[str, Any]:
+    """A billing summary part without the value already shown as the state."""
+    return {k: v for k, v in _billing(data, key).items() if k != state_key}
+
+
 SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
     ApavitalSensorEntityDescription(
         key="water_index",
@@ -119,6 +129,27 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         value_fn=lambda data: data.get("last_reading_time"),
     ),
     ApavitalSensorEntityDescription(
+        key="price_per_m3",
+        translation_key="price_per_m3",
+        name="Price per m³",
+        native_unit_of_measurement="RON/m³",
+        suggested_display_precision=2,
+        icon="mdi:cash",
+        value_fn=lambda data: _billing(data, "price").get("per_m3"),
+        extra_attrs_fn=lambda data: _billing_attrs(data, "price", "per_m3"),
+    ),
+    ApavitalSensorEntityDescription(
+        key="month_cost",
+        translation_key="month_cost",
+        name="Cost This Month",
+        native_unit_of_measurement="RON",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:cash-clock",
+        value_fn=lambda data: _billing(data, "month_cost").get("amount"),
+        extra_attrs_fn=lambda data: _billing_attrs(data, "month_cost", "amount"),
+    ),
+    ApavitalSensorEntityDescription(
         key="last_invoice",
         translation_key="last_invoice",
         name="Last Invoice",
@@ -126,12 +157,8 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         suggested_display_precision=2,
         icon="mdi:receipt-text",
-        value_fn=lambda data: ((data.get("billing") or {}).get("last_invoice") or {}).get("amount"),
-        extra_attrs_fn=lambda data: {
-            key: value
-            for key, value in ((data.get("billing") or {}).get("last_invoice") or {}).items()
-            if key != "amount"
-        },
+        value_fn=lambda data: _billing(data, "last_invoice").get("amount"),
+        extra_attrs_fn=lambda data: _billing_attrs(data, "last_invoice", "amount"),
     ),
     ApavitalSensorEntityDescription(
         key="invoice_estimate",
@@ -141,12 +168,8 @@ SENSOR_DESCRIPTIONS: tuple[ApavitalSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         suggested_display_precision=2,
         icon="mdi:receipt-text-clock",
-        value_fn=lambda data: ((data.get("billing") or {}).get("estimate") or {}).get("amount"),
-        extra_attrs_fn=lambda data: {
-            key: value
-            for key, value in ((data.get("billing") or {}).get("estimate") or {}).items()
-            if key != "amount"
-        },
+        value_fn=lambda data: _billing(data, "estimate").get("amount"),
+        extra_attrs_fn=lambda data: _billing_attrs(data, "estimate", "amount"),
     ),
     ApavitalSensorEntityDescription(
         key="meter_serial",
