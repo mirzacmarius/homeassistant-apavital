@@ -125,6 +125,17 @@ To configure the threshold (default: 0.1 m³/hour ≈ 100 L/hour):
 2. Click **Configure**
 3. Adjust "Leak detection threshold"
 
+## 🧾 Invoice Estimate
+
+Every 6 hours the integration reads your invoices and the official meter readings Apavital bills from:
+
+- **Last Invoice** – amount of the latest invoice (number, issue and due date as attributes)
+- **Next Invoice Estimate** – water used since the last official reading × your price per m³
+
+The price per m³ is the median of your last 3 invoices divided by the m³ each one billed, so it includes sewage, fees and VAT as Apavital charges them. If the invoices can't be read, both sensors stay unknown and the water sensors keep working.
+
+The water statistic is also kept as a copy in m³ (`apavital:<client_code>_water_consumption_m3`), for statistics graphs of months and years, which can't convert units themselves.
+
 ## 🔧 Services
 
 ### `apavital.refresh_data`
